@@ -43,7 +43,7 @@ class Venue(db.Model):
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
     website_link = db.Column(db.String(120))
-    seeking_talent = db.Column(db.String(120), db.ForeignKey('Artist.id'))
+    seeking_talent = db.Column(db.Boolean(120), db.ForeignKey('Artist.id'))
     description = db.Column(db.String(500))
     
 
@@ -61,7 +61,7 @@ class Artist(db.Model):
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
     website_link = db.Column(db.String(120))
-    seeking_venue = db.Column(db.String(120), db.ForeignKey('Venue.id'))
+    seeking_venue = db.Column(db.Boolean(120), db.ForeignKey('Venue.id'))
     description = db.Column(db.String(500))
 
     # Show = db.relationship('Show', backref='Artist')
@@ -104,7 +104,21 @@ def index():
 
 @app.route('/venues')
 def venues():
+
   # TODO: replace with real venues data.
+  id = request.form.get('id')
+  name = request.form.get('name')
+  city = request.form.get('city')
+  state = request.form.get('state')
+  address = request.form.get('address')
+  phone = request.form.get('phone')
+  genre = request.form.get('genre')
+  facebook_link = request.form.get('favebook_link')
+  image_link = request.form.get('image_link')
+  seeking_talent = request.form.get('seeking_talent')
+  description = request.form.get('description')
+
+
   #       num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
   data=[{
     "city": "San Francisco",
@@ -447,6 +461,12 @@ def create_artist_submission():
 
 @app.route('/shows')
 def shows():
+  # insert_show = Show.form.get(
+  #   artist_id = Form.artist_id.data,
+  #   venue_id = Form.venue_id.data,
+  #   start_time = Form.start_time.data
+
+  # )
   # displays list of shows at /shows
   # TODO: replace with real venues data.
   data=[{
