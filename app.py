@@ -358,6 +358,28 @@ def search_artists():
   # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
   # seach for "A" should return "Guns N Petals", "Matt Quevado", and "The Wild Sax Band".
   # search for "band" should return "The Wild Sax Band".
+
+  search_term=request.form.get('search_term', '')
+  search_result = Artist.query.filter(Artist.name.ilike(f'%{search_term}%')).all()
+  search_count = Artist.query.count(Artist.name.ilike(f'%{search_term}%')).count()
+  response = searchResponseBody(search_count, search_result)
+
+def searchResponseBody(search_count, search_result):
+  response={
+    'count': search_count,
+    'data': []
+  }
+
+  for result in search_result:
+    venue ={
+      'id': result.id,
+      'name': result.name,
+      'num_upcoming_shows': num_of_upcoming_shows(result.id)
+    }
+
+    response['data'].append(venue)
+  return response
+
   response={
     "count": 1,
     "data": [{
@@ -550,7 +572,7 @@ def create_artist_submission():
 
 @app.route('/shows')
 def shows():
-  
+
   form: ShowForm(request.form)
   show = Show(
       artist_id = Form.artist_id.data,
