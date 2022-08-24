@@ -1,8 +1,11 @@
 #----------------------------------------------------------------------------#
 # Imports
 #----------------------------------------------------------------------------#
-
+from itertools import count
+from ntpath import join
+import os
 import json
+from sre_parse import State
 import dateutil.parser
 import babel
 from flask import Flask, render_template, request, Response, flash, redirect, url_for
@@ -11,9 +14,11 @@ from flask_sqlalchemy import SQLAlchemy
 import logging
 from logging import Formatter, FileHandler
 from flask_wtf import Form
+from flask_migrate import Migrate
+
 from forms import *
 from config import *
-from flask_migrate import Migrate
+from flask_wtf.csrf import CSRFProtect
 from sqlalchemy_utils import PhoneNumberType
 #----------------------------------------------------------------------------#
 # App Config.
@@ -22,9 +27,10 @@ from sqlalchemy_utils import PhoneNumberType
 app = Flask(__name__)
 moment = Moment(app)
 app.config.from_object('config')
+
+# TODO: connect to a local postgresql database
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
-# TODO: connect to a local postgresql database
 
 #----------------------------------------------------------------------------#
 # Models.
@@ -34,48 +40,52 @@ class Venue(db.Model):
     __tablename__ = 'Venue'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
-    city = db.Column(db.String(120))
-    state = db.Column(db.String(120))
-    address = db.Column(db.String(120))
-    phone = db.Column(db.String(20))
-    genres = db.Column(db.String(500))
-    image_link = db.Column(db.String(500))
-    facebook_link = db.Column(db.String(120))
-    website_link = db.Column(db.String(120))
-    seeking_talent = db.Column(db.Boolean(120), db.ForeignKey('Artist.id'))
-    description = db.Column(db.String(500))
-    
+    name = db.Column(db.String(120), nullable=False)
+    city = db.Column(db.String(120), nullable=False)
+    state = db.Column(db.String(120), nullable=False)
+    address = db.Column(db.String(120), nullable=False)
+    phone = db.Column(db.String(20), nullable=False)
+    image_link = db.Column(db.String(500), nullable=False)
+    facebook_link = db.Column(db.String(120), nullable=False)
+     
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
+    genres = " ".join(request.form['genres']),
+    website_link = db.Column(db.String(120), nullable=False)
+    seeking_talent = db.Column(db.Boolean, nullable=False)
+    description = db.Column(db.String(500), nullable=False)
+    Show = db.relationship('Show', backref='Venue', lazy=True)
+
+
+
 
 class Artist(db.Model):
     __tablename__ = 'Artist'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String)
-    city = db.Column(db.String(120))
-    state = db.Column(db.String(120))
-    phone = db.Column(db.Unicode(20))
-    genres = db.Column(db.String(120))
-    image_link = db.Column(db.String(500))
-    facebook_link = db.Column(db.String(120))
-    website_link = db.Column(db.String(120))
-    seeking_venue = db.Column(db.Boolean(120), db.ForeignKey('Venue.id'))
-    description = db.Column(db.String(500))
-
-    # Show = db.relationship('Show', backref='Artist')
-
+    name = db.Column(db.String(120), nullable=False)
+    city = db.Column(db.String(120), nullable=False)
+    state = db.Column(db.String(120), nullable=False)
+    phone = db.Column(db.Unicode(20), nullable=False)
+    image_link = db.Column(db.String(500), nullable=False)
+    facebook_link = db.Column(db.String(120), nullable=False)
+    
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
+    genres = db.Column(db.String(120), " ".join(request.form['genres']), nullable=False)
+    website_link = db.Column(db.String(120), nullable=False)
+    seeking_venue = db.Column(db.Boolean, nullable=False)
+    description = db.Column(db.String(500), nullable=False)
+    Show = db.relationship('Show', backref='Artist', lazy=True)
 
 # TODO Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
 class Show(db.Model):
     __tablename__ = 'Show'
-
+    
+    id = db.Column(db.Integer, primary_key=True)
     artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), nullable=False)
     venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), nullable=False)
-    start_time = db.Column(db.Time, primary_key=True)
+    start_time = db.Column(db.DateTime)
 #----------------------------------------------------------------------------#
 # Filters.
 #----------------------------------------------------------------------------#
@@ -106,6 +116,7 @@ def index():
 def venues():
 
   # TODO: replace with real venues data.
+  venues = Venue.query.all()
   id = request.form.get('id')
   name = request.form.get('name')
   city = request.form.get('city')
@@ -120,6 +131,11 @@ def venues():
 
 
   #       num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
+  upcoming_shows = db.session.query(show).join(Artist).filter(Show.venue_id==venue_id).filter(
+    Show.start_time> datetime.now()).all()
+  
+  num_of_upcoming_shows = (upcoming_shows.query)
+  
   data=[{
     "city": "San Francisco",
     "state": "CA",
@@ -148,6 +164,32 @@ def search_venues():
   # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
   # seach for Hop should return "The Musical Hop".
   # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
+
+  search_term=request.form.get('search_term', '')
+  search_result = Venue.query.filter(Venue.name.ilike(f'%{search_term}%')).all()
+  search_count = Venue.query.count(Venue.name.ilike(f'%{search_term}%')).count()
+  response = searchResponseBody(search_count, search_result)
+
+def searchResponseBody(search_count, search_result):
+  response={
+    'count': search_count,
+    'data': []
+  }
+
+  for result in search_result:
+    venue ={
+      'id': result.id,
+      'name': result.name,
+      'num_upcoming_shows': num_of_upcoming_shows(result.id)
+    }
+
+    response['data'].append(venue)
+  return response
+
+
+
+
+
   response={
     "count": 1,
     "data": [{
@@ -254,12 +296,35 @@ def create_venue_form():
 def create_venue_submission():
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
-
+  try:
+    form: VenueForm(request.form)
+    venue = Venue(
+      name = form.name.data,
+      city =  form.city.data,
+      State = form.state.data,
+      address = form.address.data,
+      phone = form.phone.data,
+      genres = " ".join(form.genres.data),
+      facebook_link = form.facebook_link.data,
+      image_link = form.image_link.data,
+      seeking_talent = form.seeking_talent.data,
+      description = form.description.data
+    )
+    db.session.add(venue)
+    db.session.commit()
+    
   # on successful db insert, flash success
-  flash('Venue ' + request.form['name'] + ' was successfully listed!')
+    flash('Venue ' + request.form['name'] + ' was successfully listed!')
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
+  except:
+    db.session.rollback()
+    flash('An error occurred. Venue ' + request.form['name'] + ' could not be listed.')
+
+  finally:
+    db.session.close()
+
   return render_template('pages/home.html')
 
 @app.route('/venues/<venue_id>', methods=['DELETE'])
