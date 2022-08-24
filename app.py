@@ -513,11 +513,35 @@ def create_artist_submission():
   # called upon submitting the new artist listing form
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
+  try:
+      form: ArtistForm(request.form)
+      artist = Artist(
+        name = form.name.data,
+        city =  form.city.data,
+        State = form.state.data,
+        address = form.address.data,
+        phone = form.phone.data,
+        genres = " ".join(form.genres.data),
+        facebook_link = form.facebook_link.data,
+        image_link = form.image_link.data,
+        seeking_venue = form.seeking_venue.data,
+        description = form.description.data
+    )
+      db.session.add(artist)
+      db.session.commit()
 
   # on successful db insert, flash success
-  flash('Artist ' + request.form['name'] + ' was successfully listed!')
+  
+      flash('Artist ' + request.form['name'] + ' was successfully listed!')
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
+
+  except:
+    db.session.rollback()
+    flash('An error occurred. Artist ' + request.form['name'] + ' could not be listed.')
+  finally:
+    db.session.close()
+
   return render_template('pages/home.html')
 
 
@@ -526,10 +550,13 @@ def create_artist_submission():
 
 @app.route('/shows')
 def shows():
-  # insert_show = Show.form.get(
-  #   artist_id = Form.artist_id.data,
-  #   venue_id = Form.venue_id.data,
-  #   start_time = Form.start_time.data
+  
+  form: ShowForm(request.form)
+  show = Show(
+      artist_id = Form.artist_id.data,
+      venue_id = Form.venue_id.data,
+      start_time = Form.start_time.data
+  )
 
   # )
   # displays list of shows at /shows
