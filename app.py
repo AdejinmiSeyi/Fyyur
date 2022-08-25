@@ -28,9 +28,11 @@ app = Flask(__name__)
 moment = Moment(app)
 app.config.from_object('config')
 
+
 # TODO: connect to a local postgresql database
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
 
 #----------------------------------------------------------------------------#
 # Models.
@@ -50,7 +52,7 @@ class Venue(db.Model):
      
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
-    genres = " ".join(request.form['genres']),
+    genres = db.Column(db.ARRAY(db.String), nullable=False)
     website_link = db.Column(db.String(120), nullable=False)
     seeking_talent = db.Column(db.Boolean, nullable=False)
     description = db.Column(db.String(500), nullable=False)
@@ -72,7 +74,7 @@ class Artist(db.Model):
     
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
-    genres = db.Column(db.String(120), " ".join(request.form['genres']), nullable=False)
+    genres = db.Column(db.ARRAY(db.String(120)), nullable=False)
     website_link = db.Column(db.String(120), nullable=False)
     seeking_venue = db.Column(db.Boolean, nullable=False)
     description = db.Column(db.String(500), nullable=False)
@@ -116,48 +118,70 @@ def index():
 def venues():
 
   # TODO: replace with real venues data.
-  venues = Venue.query.all()
-  id = request.form.get('id')
-  name = request.form.get('name')
-  city = request.form.get('city')
-  state = request.form.get('state')
-  address = request.form.get('address')
-  phone = request.form.get('phone')
-  genre = request.form.get('genre')
-  facebook_link = request.form.get('favebook_link')
-  image_link = request.form.get('image_link')
-  seeking_talent = request.form.get('seeking_talent')
-  description = request.form.get('description')
+  if request.method == 'POST':
+    
+    id = int(request.form['id'])
+    name = request.form['name']
+    city = request.form['city']
+    state = request.form['state']
+    address = request.form['address']
+    phone = int(request.form['phone'])
+    genre = request.form.getlist['genre']
+    facebook_link = request.form['favebook_link']
+    image_link = request.form['image_link']
+    website_link = request.form['website_link']
+    seeking_talent = request.form['seeking_talent']
+    description = request.form['description']
+
+    venue = Venue(id=id,
+                  name=name,
+                  city=city,
+                  state=state,
+                  address=address,
+                  phone=phone,
+                  genre=genre,
+                  facebook_link=facebook_link,
+                  image_link=image_link,
+                  website_link=website_link,
+                  seeking_talent=seeking_talent,
+                  description=description)
+
+    db.session.add(venue)
+    db.session.commit()
+
+    return render_template('pages/venues.html', areas=data)
 
 
   #       num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
-  upcoming_shows = db.session.query(show).join(Artist).filter(Show.venue_id==venue_id).filter(
+  upcoming_shows = db.session.query(Show).join(Artist).filter(Show.venue_id==venue_id).filter(
     Show.start_time> datetime.now()).all()
   
   num_of_upcoming_shows = (upcoming_shows.query)
   
-  data=[{
-    "city": "San Francisco",
-    "state": "CA",
-    "venues": [{
-      "id": 1,
-      "name": "The Musical Hop",
-      "num_upcoming_shows": 0,
-    }, {
-      "id": 3,
-      "name": "Park Square Live Music & Coffee",
-      "num_upcoming_shows": 1,
-    }]
-  }, {
-    "city": "New York",
-    "state": "NY",
-    "venues": [{
-      "id": 2,
-      "name": "The Dueling Pianos Bar",
-      "num_upcoming_shows": 0,
-    }]
-  }]
-  return render_template('pages/venues.html', areas=data);
+  # data=[{
+  #   "city": "San Francisco",
+  #   "state": "CA",
+  #   "venues": [{
+  #     "id": 1,
+  #     "name": "The Musical Hop",
+  #     "num_upcoming_shows": 0,
+  #   }, {
+  #     "id": 3,
+  #     "name": "Park Square Live Music & Coffee",
+  #     "num_upcoming_shows": 1,
+  #   }]
+  # }, {
+  #   "city": "New York",
+  #   "state": "NY",
+  #   "venues": [{
+  #     "id": 2,
+  #     "name": "The Dueling Pianos Bar",
+  #     "num_upcoming_shows": 0,
+  #   }]
+  # }]
+
+  # return render_template('pages/venues.html', areas=data);
+  
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
@@ -165,7 +189,7 @@ def search_venues():
   # seach for Hop should return "The Musical Hop".
   # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
 
-  search_term=request.form.get('search_term', '')
+  search_term=request.form('search_term', ' ')
   search_result = Venue.query.filter(Venue.name.ilike(f'%{search_term}%')).all()
   search_count = Venue.query.count(Venue.name.ilike(f'%{search_term}%')).count()
   response = searchResponseBody(search_count, search_result)
@@ -186,19 +210,16 @@ def searchResponseBody(search_count, search_result):
     response['data'].append(venue)
   return response
 
-
-
-
-
-  response={
-    "count": 1,
-    "data": [{
-      "id": 2,
-      "name": "The Dueling Pianos Bar",
-      "num_upcoming_shows": 0,
-    }]
-  }
-  return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
+  # response={
+  #   "count": 1,
+  #   "data": [{
+  #     "id": 2,
+  #     "name": "The Dueling Pianos Bar",
+  #     "num_upcoming_shows": 0,
+  #   }]
+  # }
+  
+  return render_template('pages/search_venues.html', results=response, search_term=request.form('search_term', ''))
 
 @app.route('/venues/<int:venue_id>')
 def show_venue(venue_id):
@@ -304,7 +325,7 @@ def create_venue_submission():
       State = form.state.data,
       address = form.address.data,
       phone = form.phone.data,
-      genres = " ".join(form.genres.data),
+      genres = request.form.getlist['genre'],
       facebook_link = form.facebook_link.data,
       image_link = form.image_link.data,
       seeking_talent = form.seeking_talent.data,
@@ -359,7 +380,7 @@ def search_artists():
   # seach for "A" should return "Guns N Petals", "Matt Quevado", and "The Wild Sax Band".
   # search for "band" should return "The Wild Sax Band".
 
-  search_term=request.form.get('search_term', '')
+  search_term=request.form('search_term', '')
   search_result = Artist.query.filter(Artist.name.ilike(f'%{search_term}%')).all()
   search_count = Artist.query.count(Artist.name.ilike(f'%{search_term}%')).count()
   response = searchResponseBody(search_count, search_result)
@@ -388,7 +409,7 @@ def searchResponseBody(search_count, search_result):
       "num_upcoming_shows": 0,
     }]
   }
-  return render_template('pages/search_artists.html', results=response, search_term=request.form.get('search_term', ''))
+  return render_template('pages/search_artists.html', results=response, search_term=request.form('search_term', ''))
 
 @app.route('/artists/<int:artist_id>')
 def show_artist(artist_id):
@@ -669,6 +690,6 @@ if __name__ == '__main__':
 # Or specify port manually:
 '''
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ[]PORT', 5000))
     app.run(host='0.0.0.0', port=port)
 '''
