@@ -49,8 +49,7 @@ class Venue(db.Model):
     phone = db.Column(db.String(20), nullable=False)
     image_link = db.Column(db.String(500), nullable=False)
     facebook_link = db.Column(db.String(120), nullable=False)
-     
-
+    
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
     genres = db.Column(db.ARRAY(db.String), nullable=False)
     website_link = db.Column(db.String(120), nullable=False)
@@ -119,7 +118,6 @@ def venues():
 
   # TODO: replace with real venues data.
   if request.method == 'POST':
-    
     id = int(request.form['id'])
     name = request.form['name']
     city = request.form['city']
@@ -132,7 +130,6 @@ def venues():
     website_link = request.form['website_link']
     seeking_talent = request.form['seeking_talent']
     description = request.form['description']
-
     venue = Venue(id=id,
                   name=name,
                   city=city,
@@ -320,16 +317,17 @@ def create_venue_submission():
   try:
     form: VenueForm(request.form)
     venue = Venue(
-      name = form.name.data,
-      city =  form.city.data,
-      State = form.state.data,
-      address = form.address.data,
-      phone = form.phone.data,
+      name = request.form['name'],
+      city =  request.form['city'],
+      State = request.form['state'],
+      address = request.form['address'],
+      phone = request.form['phone'],
       genres = request.form.getlist['genre'],
-      facebook_link = form.facebook_link.data,
-      image_link = form.image_link.data,
-      seeking_talent = form.seeking_talent.data,
-      description = form.description.data
+      facebook_link = request.form['facebook_link'],
+      image_link = request.form['image_link.data'],
+      website_link = request.form['website_link'],
+      seeking_talent = request.form['seeking_talent'],
+      description = request.form['description']
     )
     db.session.add(venue)
     db.session.commit()
@@ -342,7 +340,6 @@ def create_venue_submission():
   except:
     db.session.rollback()
     flash('An error occurred. Venue ' + request.form['name'] + ' could not be listed.')
-
   finally:
     db.session.close()
 
@@ -352,6 +349,9 @@ def create_venue_submission():
 def delete_venue(venue_id):
   # TODO: Complete this endpoint for taking a venue_id, and using
   # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
+  venue = Venue.query.get_or_404(venue_id)
+  db.session.delete(venue)
+  db.session.commit()
 
   # BONUS CHALLENGE: Implement a button to delete a Venue on a Venue Page, have it so that
   # clicking that button delete it from the db then redirect the user to the homepage
