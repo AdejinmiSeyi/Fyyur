@@ -14,7 +14,7 @@ from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
 import logging
 from logging import Formatter, FileHandler
-from flask_wtf import Form
+from flask_wtf import form, Form
 from flask_migrate import Migrate
 
 from forms import *
@@ -328,31 +328,45 @@ def create_venue_submission():
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
   try:
-    form = VenueForm(request.form)
-    venue = Venue(
-      name = form.name.data,
-      city =  form.city.data,
-      State = form.state.data,
-      address = form.address.data,
-      phone = form.phone.data,
-      genres = form.genres.data,
-      facebook_link = form.facebook_link.data,
-      image_link = form.image_link.data,
-      website_link = form.website_link.data,
-      seeking_talent = form.seeking_talent.data,
-      seeking_description = form.seeking_description.data
-      )
-    db.session.add(venue)
+
+    if request.method == 'POST':
+      name = request.form.get['name']
+      city =  request.form.get['city']
+      State = request.form.get['state']
+      address = request.form.get['address']
+      phone = request.form.get['phone']
+      genres = request.form.get['genres']
+      facebook_link = request.form.get['facebook_link']
+      image_link = request.form.get['image_link']
+      website_link = request.form.get['website_link']
+      seeking_venue = request.form.get['seeking_venue']
+      seeking_description = request.form.get['description ']
+      
+    # form = VenueForm(request.form)
+    # venue = Venue(
+    #   name = form.name.data,
+    #   city =  form.city.data,
+    #   state = form.state.data,
+    #   address = form.address.data,
+    #   phone = form.phone.data,
+    #   genres = form.genres.data,
+    #   facebook_link = form.facebook_link.data,
+    #   image_link = form.image_link.data,
+    #   website_link = form.website_link.data,
+    #   seeking_talent = form.seeking_talent.data,
+    #   seeking_description = form.seeking_description.data
+    #   )
+    db.session.add()
     db.session.commit()
 
   # on successful db insert, flash success
-    flash('Venue ' + form.name.data + ' was successfully listed!')
+    flash('Venue   was successfully listed!')
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
   except:
     db.session.rollback()
     print(sys.exc_info())
-    flash('An error occurred. Venue ' + form.name.data + ' could not be listed.')
+    flash('An error occurred. Venue  could not be listed.')
   finally:
     db.session.close()
 
@@ -376,24 +390,17 @@ def delete_venue(venue_id):
 
   # BONUS CHALLENGE: Implement a button to delete a Venue on a Venue Page, have it so that
   # clicking that button delete it from the db then redirect the user to the homepage
-  return redirect(url_for())
+  return redirect(url_for('index'))
 
 #  Artists
 #  ----------------------------------------------------------------
 @app.route('/artists')
 def artists():
   # TODO: replace with real data returned from querying the database
-  data=[{
-    "id": 4,
-    "name": "Guns N Petals",
-  }, {
-    "id": 5,
-    "name": "Matt Quevedo",
-  }, {
-    "id": 6,
-    "name": "The Wild Sax Band",
-  }]
-  return render_template('pages/artists.html', artists=data)
+  artists_data = db.session.query(Artist.id, Artist.name).all()
+
+  return render_template('pages/artists.html', artists=artists_data)
+  # return render_template('pages/artists.html', artists=data)
 
 @app.route('/artists/search', methods=['POST'])
 def search_artists():
@@ -604,23 +611,39 @@ def create_artist_submission():
   # called upon submitting the new artist listing form
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
-  form: ArtistForm(request.form)
+  
   try:
-    artist = Artist(
+    form = ArtistForm(request.form)
+    artists = Artist(
       name = form.name.data,
       city =  form.city.data,
-      State = form.state.data,
-      address = form.address.data,
+      state = form.state.data,
       phone = form.phone.data,
       genres = form.genres.data,
       facebook_link = form.facebook_link.data,
       image_link = form.image_link.data,
       website_link = form.website_link.data,
       seeking_venue = form.seeking_venue.data,
-      seeking_description = form.description.data
+      seeking_description = form.seeking_description.data
       )
-    db.session.add(artist)
+    db.session.add(artists)
     db.session.commit()
+    # form = ArtistForm(request.form)
+    # artist = Artist(
+    #   name = request.form['name'],
+    #   city =  request.form['city'],
+    #   State = request.form['state'],
+    #   address = request.form['address'],
+    #   phone = request.form['phone'],
+    #   genres = request.form['genres'],
+    #   facebook_link = request.form['facebook_link'],
+    #   image_link = request.form['image_link'],
+    #   website_link = request.form['website_link'],
+    #   seeking_venue = request.form['seeking_venue'],
+    #   seeking_description = request.form['description ']
+    #   )
+    # db.session.add(artist)
+    # db.session.commit()
 
   # on successful db insert, flash success
     flash('Artist ' + form.name.data + ' was successfully listed!')
