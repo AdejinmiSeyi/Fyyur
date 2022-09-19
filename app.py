@@ -14,7 +14,7 @@ from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
 import logging
 from logging import Formatter, FileHandler
-from flask_wtf import form, Form
+from flask_wtf import Form as BaseForm
 from flask_migrate import Migrate
 
 from forms import *
@@ -28,7 +28,7 @@ from sqlalchemy_utils import PhoneNumberType
 app = Flask(__name__)
 moment = Moment(app)
 app.config.from_object('config')
-# db.init_app(app)
+
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
@@ -50,7 +50,7 @@ class Venue(db.Model):
     facebook_link = db.Column(db.String(120), nullable=False)
     
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
-    genres = db.Column(db.ARRAY(db.String), nullable=False)
+    genres = db.Column(db.ARRAY(db.String(120)), nullable=False)
     website_link = db.Column(db.String(120), nullable=False)
     seeking_talent = db.Column(db.Boolean, nullable=False)
     seeking_description = db.Column(db.String(500), nullable=False)
@@ -290,7 +290,7 @@ def create_venue_submission():
       seeking_talent = form.seeking_talent.data,
       seeking_description = form.seeking_description.data
       )
-    db.session.add(Venue)
+    db.session.add(venue)
     db.session.commit()
 
   # on successful db insert, flash success
@@ -299,7 +299,7 @@ def create_venue_submission():
   # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
   except:
     db.session.rollback()
-    print(sys.exc_info())
+    print("MY ERROR MESSAGE: ", sys.exc_info())
     flash('An error occurred. Venue could not be listed.')
   finally:
     db.session.close()
@@ -483,14 +483,6 @@ def edit_venue(venue_id):
 
   return render_template('forms/edit_venue.html', form=form, venue=venue)
 
-@app.route('/venues/<int:venue_id>/edit', methods=['GET'])
-def edit_venue(venue_id):
-  form = VenueForm()
-  
-  # TODO: populate form with values from venue with ID <venue_id>
-  venue = Artist.query.get(venue_id)
-
-  return render_template('forms/edit_venue.html', form=form, venue=venue)
 
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):
