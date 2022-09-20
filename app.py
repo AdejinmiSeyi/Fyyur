@@ -48,13 +48,14 @@ class Venue(db.Model):
     phone = db.Column(db.String(20), nullable=False)
     image_link = db.Column(db.String(500), nullable=False)
     facebook_link = db.Column(db.String(120), nullable=False)
-    
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
     genres = db.Column(db.ARRAY(db.String(120)), nullable=False)
     website_link = db.Column(db.String(120), nullable=False)
     seeking_talent = db.Column(db.Boolean, nullable=False)
     seeking_description = db.Column(db.String(500), nullable=False)
+    shows = db.relationship('Show', cascade="all, delete-orphan", backref=('venue'))
     # artist = db.relationship('Artist', secondary = 'Show', backref=db.backref('artist', lazy=True))
+    
 
     def __repr__(self):
        return f'<Venue {self.name} {self.city} {self.state} >'
@@ -95,12 +96,12 @@ class Show(db.Model):
 #----------------------------------------------------------------------------#
 
 def total_num_of_upcoming_shows(id):
-    return Show.query.filter(Show.start_time > datetime.now(), Show.venue_id==id).count()
-
+    # return Show.query.filter(Show.start_time > datetime.now(), Show.venue_id==id).count()
+    return Venue.query.join(Venue.shows).filter(Show.start_time > datetime.now()).count()
 
 def total_num_of_past_shows(id):
-  return Show.query.filter(Show.start_time < datetime.now(), Show.venue_id==id).count()
-
+  # return Show.query.filter(Show.start_time < datetime.now(), Show.venue_id==id).count()
+  return Venue.query.join(Venue.shows).filter(Show.start_time < datetime.now()).count()
 
 def format_datetime(value, format='medium'):
   date = dateutil.parser.parse(value)
@@ -173,16 +174,28 @@ def search_venues():
   # seach for Hop should return "The Musical Hop".
   # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
 
-  search_term=request.form('search_term', ' ')
-  search_result = Venue.query.filter(Venue.name.ilike(f'%{search_term}%')).all()
-  search_count = Venue.query.count(Venue.name.ilike(f'%{search_term}%')).count()
-  response = searchResponseBody(search_count, search_result)
+  # search_term=request.form['search_term']
+
+  # search_result = Venue.query.filter(Venue.name.ilike(f'%{search_term}%')).all()
+  # search_count = search_result.count(Venue.name.ilike(f'%{search_term}%')).count()
+  # response = searchResponseBody(search_count, search_result)
+
+  search_term=request.form['search_term']
+ 
+  if search_term == "":
+         flash('Please specify the name of the venue in your search phrase.')
+         return redirect(url_for('venues'))
+ 
+  search_result = Venue.query.filter(Venue.name.ilike('%' + search_term + '%')).order_by(Venue.id).all()
+  search_count = len(search_result)
 
 def searchResponseBody(search_count, search_result):
   response={
     'count': search_count,
     'data': []
   }
+  # prtString = json.dumps(search_count, search_result)
+  # print('Error message: ', prtString)
 
   for result in search_result:
     venue ={
@@ -192,7 +205,8 @@ def searchResponseBody(search_count, search_result):
     }
 
     response['data'].append(venue)
-  return response
+    return response
+  return render_template('pages/search_venues.html', results=response, search_term=request.form('search_term', ''))
 
   # response={
   #   "count": 1,
@@ -310,21 +324,23 @@ def create_venue_submission():
 def delete_venue(venue_id):
   # TODO: Complete this endpoint for taking a venue_id, and using
   # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
+  #deleteVenue = Venue.query.get(venue_id)
+  Venue.query.filter_by(id=venue_id).delete()
   try:
-
-    venue = Venue.query.get_or_404(venue_id)
-    db.session.delete(venue)
+    
     db.session.commit()
+    flash('Venue was successfully deleted.')
   
   except:
     db.session.rollback()
-
+    print("MY ERROR MESSAGE: ", sys.exc_info())
+    flash('An error occurred. Venue could not be deleted.')
   finally:
     db.session.close()
 
   # BONUS CHALLENGE: Implement a button to delete a Venue on a Venue Page, have it so that
   # clicking that button delete it from the db then redirect the user to the homepage
-  return redirect(url_for('index'))
+  return redirect(url_for('home.html'))
 
 #  Artists
 #  ----------------------------------------------------------------
@@ -342,10 +358,20 @@ def search_artists():
   # seach for "A" should return "Guns N Petals", "Matt Quevado", and "The Wild Sax Band".
   # search for "band" should return "The Wild Sax Band".
 
-  search_term=request.form('search_term', '')
-  search_result = Artist.query.filter(Artist.name.ilike(f'%{search_term}%')).all()
-  search_count = Artist.query.count(Artist.name.ilike(f'%{search_term}%')).count()
-  response = searchResponseBody(search_count, search_result)
+  # search_term=request.form('search_term', '')
+  # search_result = Artist.query.filter(Artist.name.ilike(f'%{search_term}%')).all()
+  # search_count = Artist.query.count(Artist.name.ilike(f'%{search_term}%')).count()
+  # response = searchResponseBody(search_count, search_result)
+
+
+  search_term=request.form['search_term']
+ 
+  if search_term == "":
+         flash('Please specify the name of the artist in your search phrase.')
+         return redirect(url_for('artists'))
+ #case sensitive search result
+  search_result = Venue.query.filter(Venue.name.ilike('%' + search_term + '%')).order_by(Venue.id).all()
+  search_count = len(search_result)
 
 def searchResponseBody(search_count, search_result):
   response={
@@ -361,7 +387,9 @@ def searchResponseBody(search_count, search_result):
     }
 
     response['data'].append(venue)
-  return response
+    return response
+  return render_template('pages/search_artists.html', results=response, search_term=request.form('search_term', ''))
+
 
   # response={
   #   "count": 1,
@@ -371,7 +399,6 @@ def searchResponseBody(search_count, search_result):
   #     "num_upcoming_shows": 0,
   #   }]
   # }
-  # return render_template('pages/search_artists.html', results=response, search_term=request.form('search_term', ''))
 
 @app.route('/artists/<int:artist_id>')
 def show_artist(artist_id):
