@@ -43,11 +43,9 @@ migrate = Migrate(app, db)
 #----------------------------------------------------------------------------#
 
 def total_num_of_upcoming_shows(id):
-    # return Show.query.filter(Show.start_time > datetime.now(), Show.venue_id==id).count()
     return Venue.query.join(Venue.shows).filter(Show.start_time > datetime.now()).count()
 
 def total_num_of_past_shows(id):
-  # return Show.query.filter(Show.start_time < datetime.now(), Show.venue_id==id).count()
   return Venue.query.join(Venue.shows).filter(Show.start_time < datetime.now()).count()
 
 def format_datetime(value, format='medium'):
