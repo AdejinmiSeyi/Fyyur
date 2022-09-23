@@ -1,11 +1,13 @@
 from datetime import datetime
 from random import choices
 from flask_wtf import Form
-from wtforms import StringField, SelectField, SelectMultipleField, DateTimeField, BooleanField
-from wtforms.validators import DataRequired, AnyOf, URL
+from wtforms import StringField, SelectField, SelectMultipleField, DateTimeField, BooleanField, HiddenField
+from wtforms.validators import DataRequired, AnyOf, URL, ValidationError, Regexp
 from wtforms_alchemy import PhoneNumberField
 from sqlalchemy_utils import PhoneNumberType
 from wtforms import TelField
+import re
+from sqlalchemy.sql import text
 
 
 class ShowForm(Form):
@@ -92,7 +94,7 @@ class VenueForm(Form):
         
     )
     image_link = StringField(
-        'image_link'
+        'image_link', validators=[URL()]
     )
     genres = SelectMultipleField(
         # TODO implement enum restriction
@@ -131,6 +133,7 @@ class VenueForm(Form):
     seeking_description = StringField(
         'seeking_description'
     )
+    csrf_token = HiddenField()
 
 
 
@@ -198,8 +201,13 @@ class ArtistForm(Form):
         ]
     )
     phone = StringField(
-        'phone', validators=[DataRequired()]
         # TODO implement validation logic for state 
+        'phone', validators=[DataRequired(),
+                    Regexp(regex=r"[\d]{3} [\d]{3} [\d]{3}",
+                    message='Enter a valid phone number'
+                    )
+                    ]
+        
     )
     image_link = StringField(
         'image_link', validators=[URL()]
@@ -242,4 +250,5 @@ class ArtistForm(Form):
     seeking_description = StringField(
             'seeking_description'
      )
+    csrf_token = HiddenField()
 

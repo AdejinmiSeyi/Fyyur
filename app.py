@@ -3,6 +3,7 @@
 #----------------------------------------------------------------------------#
 from itertools import count
 from ntpath import join
+from operator import or_
 import os
 import sys
 import json
@@ -21,7 +22,8 @@ from forms import *
 from config import *
 from models import *
 from flask_wtf.csrf import CSRFProtect
-from sqlalchemy_utils import PhoneNumberType
+from sqlalchemy import desc, or_
+from sqlalchemy.sql import text
 #----------------------------------------------------------------------------#
 # App Config.
 #----------------------------------------------------------------------------#
@@ -29,9 +31,11 @@ from sqlalchemy_utils import PhoneNumberType
 app = Flask(__name__)
 moment = Moment(app)
 app.config.from_object('config')
+
 db.init_app(app)
 migrate = Migrate(app, db)
-
+csrf = CSRFProtect()
+csrf.init_app(app)
 
 #----------------------------------------------------------------------------#
 # Models.
@@ -47,6 +51,29 @@ def total_num_of_upcoming_shows(id):
 
 def total_num_of_past_shows(id):
   return Venue.query.join(Venue.shows).filter(Show.start_time < datetime.now()).count()
+
+def searchResponseBody(search_count, search_result):
+  response={
+    "count": search_count,
+    "data": [] 
+  }
+  
+  data = []
+
+  for result in search_result:
+    data.append({
+            "id": result.id,
+            "name": result.name,
+            "num_upcoming_shows": len(Venue.query.join(Venue.shows).filter(Show.start_time > datetime.now()).all()),
+        })
+    # venue={
+    #   "id":result.id,
+    #   "name": result.name,
+    #   "num_upcoming_shows": num_upcoming_shows(result.id)
+    # }
+    response["data"].append(result)
+  return response
+
 
 def format_datetime(value, format='medium'):
   date = dateutil.parser.parse(value)
@@ -114,6 +141,7 @@ def venues():
 
 
 @app.route('/venues/search', methods=['POST'])
+@csrf.exempt
 def search_venues():
   # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
   # seach for Hop should return "The Musical Hop".
@@ -124,34 +152,27 @@ def search_venues():
   # search_result = Venue.query.filter(Venue.name.ilike(f'%{search_term}%')).all()
   # search_count = search_result.count(Venue.name.ilike(f'%{search_term}%')).count()
   # response = searchResponseBody(search_count, search_result)
-
+  
   search_term=request.form['search_term']
- 
+  
   if search_term == "":
-         flash('Please specify the name of the venue in your search phrase.')
-         return redirect(url_for('venues'))
- 
-  search_result = Venue.query.filter(Venue.name.ilike('%' + search_term + '%')).order_by(Venue.id).all()
-  search_count = len(search_result)
+          flash('Please specify the name of the venue in your search phrase.')
+          return redirect(url_for('venues'))
+  
+  results = Venue.query.filter(Venue.name.ilike('%' + search_term + '%')).order_by(desc(Venue.id)).all()
+  
+  data = []
 
-def searchResponseBody(search_count, search_result):
-  response={
-    'count': search_count,
-    'data': []
-  }
-  # prtString = json.dumps(search_count, search_result)
-  # print('Error message: ', prtString)
-
-  for result in search_result:
-    venue ={
-      'id': result.id,
-      'name': result.name,
-      'num_upcoming_shows': total_num_of_upcoming_shows(result.id)
-    }
-
-    response['data'].append(venue)
-    return response
-  return render_template('pages/search_venues.html', results=response, search_term=request.form('search_term', ''))
+  for venue in results:
+    data.append({
+            "id": venue.id,
+            "name": venue.name,
+            "num_upcoming_shows": len(Venue.query.join(Venue.shows).filter(Show.start_time > datetime.now()).all()),
+        })
+  search_count = len(results)
+  response = searchResponseBody(search_count, results)
+    
+  return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
 
   # response={
   #   "count": 1,
@@ -231,39 +252,72 @@ def create_venue_form():
   return render_template('forms/new_venue.html', form=form)
 
 @app.route("/venues/create", methods=['POST'])
+@csrf.exempt
 def create_venue_submission():
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
-  try:
+  
+    # error = False
+  
+    # if phone == "":
+    #     flash('Please provide a phone number')
+    #     return render_template('forms/new_venue.html', form=form)
+    # if image_link == "":
+    #     flash('Please provide a valid URL for the image link.')
+    #     return render_template('forms/new_venue.html', form=form)
+    # if website_link == "":
+    #     flash('Please provide a valid URL for the website link.')
+    #     return render_template('forms/new_venue.html', form=form)
+    # if seeking_talent == "y":
+    #     seeking_talent = True
+    # if seeking_description == "":
+    #   flash('Please enter a description for the talent you seek.')
+    #   return render_template('forms/new_venue.html', form=form)
+    # else:
+    #     seeking_talent = False
     form = VenueForm(request.form)
-    venue = Venue(
-      name = form.name.data,
-      city =  form.city.data,
-      state = form.state.data,
-      address = form.address.data,
-      phone = form.phone.data,
-      genres = form.genres.data,
-      facebook_link = form.facebook_link.data,
-      image_link = form.image_link.data,
-      website_link = form.website_link.data,
-      seeking_talent = form.seeking_talent.data,
-      seeking_description = form.seeking_description.data
-      )
-    db.session.add(venue)
-    db.session.commit()
+    if form.validate():
+      phone = form.phone.data
+      if phone == "":
+        flash('Please provide a phone number')
+        return render_template('forms/new_venue.html', form=form)
+    try:
+      venue = Venue(
+        name = form.name.data,
+        city =  form.city.data,
+        state = form.state.data,
+        address = form.address.data,
+        phone = form.phone.data,
+        genres = form.genres.data,
+        facebook_link = form.facebook_link.data,
+        image_link = form.image_link.data,
+        website_link = form.website_link.data,
+        seeking_talent = form.seeking_talent.data,
+        seeking_description = form.seeking_description.data
+        
+        )
+        
+    
+      db.session.add(venue)
+      db.session.commit()
 
-  # on successful db insert, flash success
-    flash('Venue ' + request.form['name'] + ' was successfully listed!')
-  # TODO: on unsuccessful db insert, flash an error instead.
-  # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
-  except:
-    db.session.rollback()
-    print("MY ERROR MESSAGE: ", sys.exc_info())
-    flash('An error occurred. Venue could not be listed.')
-  finally:
-    db.session.close()
+    # on successful db insert, flash success
+      flash('Venue ' + request.form['name'] + ' was successfully listed!')
+    # TODO: on unsuccessful db insert, flash an error instead.
+    # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
+    except:
+      db.session.rollback()
+      print("MY ERROR MESSAGE: ", sys.exc_info())
+      flash('An error occurred. Venue could not be listed.')
+    finally:
+      db.session.close()
+  # else:
+  #     for field, message in form.errors.data():
+  #       flash(field + ' - ' + str(message), 'danger')
+  #     return render_template('forms/new_venue.html', form=form)
 
-  return render_template('pages/home.html', venue=Venue)
+    return render_template('pages/home.html', venue=Venue)
+
 
 @app.route('/venues/<venue_id>', methods=['DELETE'])
 def delete_venue(venue_id):
@@ -298,6 +352,7 @@ def artists():
   # return render_template('pages/artists.html', artists=data)
 
 @app.route('/artists/search', methods=['POST'])
+@csrf.exempt
 def search_artists():
   # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
   # seach for "A" should return "Guns N Petals", "Matt Quevado", and "The Wild Sax Band".
@@ -308,34 +363,28 @@ def search_artists():
   # search_count = Artist.query.count(Artist.name.ilike(f'%{search_term}%')).count()
   # response = searchResponseBody(search_count, search_result)
 
-
   search_term=request.form['search_term']
- 
+  
   if search_term == "":
-         flash('Please specify the name of the artist in your search phrase.')
-         return redirect(url_for('artists'))
- #case sensitive search result
-  search_result = Venue.query.filter(Venue.name.ilike('%' + search_term + '%')).order_by(Venue.id).all()
-  search_count = len(search_result)
+          flash('Please specify the name of the artist in your search phrase.')
+          return redirect(url_for('artists'))
+  
+  results = Artist.query.filter(Artist.name.ilike('%' + search_term + '%')).order_by(desc(Artist.id)).all()
+  
+  data = []
 
-def searchResponseBody(search_count, search_result):
-  response={
-    'count': search_count,
-    'data': []
-  }
+  for artist in results:
+    data.append({
+            "id": artist.id,
+            "name": artist.name,
+            "num_upcoming_shows": len(Artist.query.join(Artist.shows).filter(Show.start_time > datetime.now()).all()),
+        })
+  search_count = len(results)
+  response = searchResponseBody(search_count, results)
+    
+  return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
 
-  for result in search_result:
-    venue ={
-      'id': result.id,
-      'name': result.name,
-      'num_upcoming_shows': total_num_of_upcoming_shows(result.id)
-    }
-
-    response['data'].append(venue)
-    return response
-  return render_template('pages/search_artists.html', results=response, search_term=request.form('search_term', ''))
-
-
+  
   # response={
   #   "count": 1,
   #   "data": [{
@@ -363,13 +412,11 @@ def show_artist(artist_id):
   "id": showArtist.id,
   "name": showArtist.name,
   "genres": showArtist.genres,
-  "address": showArtist.address,
   "city": showArtist.city,
   "state": showArtist.state,
   "phone": showArtist.phone,
   "website": showArtist.website_link,
   "facebook_link": showArtist.facebook_link ,
-  "seeking_talent": showArtist.seeking_talent,
   "seeking_description": showArtist.seeking_description,
   "image_link": showArtist.image_link,
   "past_shows": [],
@@ -570,9 +617,10 @@ def shows():
       "artist_id": show[2],
       "artist_name": show[3],
       "artist_image_link": show[4],
-      "start_time": show[5]
+      "start_time": format_datetime(str(show.start_time))
     }
     ListOfShows.append(object)
+
   return render_template('pages/shows.html', shows=ListOfShows)
 
   
@@ -638,14 +686,14 @@ def create_show_submission():
 
   # on successful db insert, flash success
     flash('Show was successfully listed!')
+    return redirect(url_for('index'))
   except:
   # TODO: on unsuccessful db insert, flash an error instead.
   # e.g., flash('An error occurred. Show could not be listed.')
   # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
     db.session.rollback()
     flash('An error occured! Show could not be listed!')
-
-  return render_template('pages/home.html')
+    return render_template('pages/home.html')
   # return render_template('pages/shows.html', shows=Show)
 
 @app.errorhandler(404)
@@ -681,3 +729,7 @@ if __name__ == '__main__':
     port = int(os.environ[]PORT', 5000))
     app.run(host='0.0.0.0', port=port)
 '''
+
+# if __name__ == '__main__':
+#     port = int(os.environ.get('PORT', 3500))
+#     app.run(host='0.0.0.0', port=port)
