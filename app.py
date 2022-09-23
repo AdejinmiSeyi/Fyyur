@@ -550,7 +550,11 @@ def create_artist_submission():
   # called upon submitting the new artist listing form
   # TODO: insert form data as a new Venue record in the db, instead
   # TODO: modify data to be the data object returned from db insertion
-  
+  if form.validate():
+      phone = form.phone.data
+      if phone == "":
+        flash('Please provide a phone number')
+        return render_template('forms/new_venue.html', form=form)
   try:
     form = ArtistForm(request.form)
     artists = Artist(
